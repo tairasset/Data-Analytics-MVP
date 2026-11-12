@@ -17,7 +17,7 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-The app prepares PNG chart downloads through Kaleido. Have a compatible Chrome or Chromium installation available. [Plotly image export setup](https://plotly.com/python/static-image-export/)
+Server-side PNG downloads use Kaleido with Chrome or Chromium. If the server cannot export images, use the download action in the interactive chart toolbar. [Plotly image export setup](https://plotly.com/python/static-image-export/)
 
 Save this example as `sample.csv`, upload it, and select `Sales` as the target with `AdSpend` and `Visits` as features.
 
@@ -39,4 +39,4 @@ East,220,310,43
 
 ## Scope
 
-The app expects at least two numeric columns. The grouping tab also needs a text category. The example CSV is synthetic. Model scores use a single random 80/20 split, so small samples can produce unstable scores.
+The app expects at least two numeric columns. The grouping tab also needs a text category. The example CSV is synthetic. Model comparison needs at least six complete, finite rows for the selected columns. Scores use a single random 80/20 split, so small samples can produce unstable scores.

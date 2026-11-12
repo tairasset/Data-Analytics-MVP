@@ -24,6 +24,15 @@ st.title("🚀 Advanced Data Analytics & AutoML Platform")
 st.markdown("Automated EDA, Business Intelligence, and Machine Learning. **Analyze, Predict, and Simulate.**")
 st.divider()
 
+def download_chart(figure, label, filename):
+    try:
+        png = figure.to_image(format="png", scale=2)
+    except (RuntimeError, ValueError, OSError):
+        st.caption("PNG export is unavailable on the server. Use the chart toolbar to download the image.")
+        return
+    st.download_button(label, data=png, file_name=filename, mime="image/png", use_container_width=True)
+
+
 # --- SIDEBAR ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2041/2041643.png", width=60)
@@ -69,7 +78,10 @@ if uploaded_file is not None:
             st.sidebar.success(f"Cleaned! Removed {dropped_count} rows containing missing values.")
 
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    cat_cols = [
+        name for name, dtype in df.dtypes.items()
+        if pd.api.types.is_string_dtype(dtype) or isinstance(dtype, pd.CategoricalDtype)
+    ]
 
     if len(numeric_cols) < 2:
         st.error("⚠️ The dataset must have at least two numerical columns to perform advanced analytics.")
@@ -104,7 +116,7 @@ if uploaded_file is not None:
                 fig_corr.update_layout(margin=dict(l=0, r=0, t=10, b=0))
                 st.plotly_chart(fig_corr, use_container_width=True)
                 
-                st.download_button("🖼️ Download Heatmap (PNG)", data=fig_corr.to_image(format="png", engine="kaleido", scale=2), file_name="heatmap.png", mime="image/png", use_container_width=True)
+                download_chart(fig_corr, "🖼️ Download Heatmap (PNG)", "heatmap.png")
             else:
                 st.info("Not enough numeric columns for correlation.")
 
@@ -134,14 +146,14 @@ if uploaded_file is not None:
                         fig_bar = px.bar(grouped_df, x=group_col, y=metric_col, text_auto='.2s', color=metric_col, color_continuous_scale="Teal", title=f"📊 Bar Chart: Top 15 {group_col}")
                         fig_bar.update_layout(xaxis_title=group_col, yaxis_title=f"{agg_func} of {metric_col}", showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=50, b=0, l=0, r=0))
                         st.plotly_chart(fig_bar, use_container_width=True)
-                        st.download_button("🖼️ Download Bar Chart", data=fig_bar.to_image(format="png", engine="kaleido", scale=2), file_name=f"bar_{group_col}.png", mime="image/png", use_container_width=True)
+                        download_chart(fig_bar, "🖼️ Download Bar Chart", f"bar_{group_col}.png")
                         
                     with chart_col2:
                         fig_pie = px.pie(grouped_df, names=group_col, values=metric_col, hole=0.35, title=f"🍩 Donut Chart: Share by {group_col}", color_discrete_sequence=px.colors.sequential.Teal)
                         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
                         fig_pie.update_layout(showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=50, b=0, l=0, r=0))
                         st.plotly_chart(fig_pie, use_container_width=True)
-                        st.download_button("🖼️ Download Donut Chart", data=fig_pie.to_image(format="png", engine="kaleido", scale=2), file_name=f"pie_{group_col}.png", mime="image/png", use_container_width=True)
+                        download_chart(fig_pie, "🖼️ Download Donut Chart", f"pie_{group_col}.png")
                     
                     st.divider()
                     st.download_button("📄 Download Full Report (CSV)", data=grouped_df.to_csv(index=False).encode('utf-8'), file_name=f"report_{group_col}.csv", mime="text/csv", use_container_width=True)
@@ -164,7 +176,10 @@ if uploaded_file is not None:
         
         if len(feature_cols) > 0:
             # Data prep
-            ml_df = df[feature_cols + [target_col]].dropna()
+            ml_df = df[feature_cols + [target_col]].replace([np.inf, -np.inf], np.nan).dropna()
+            if len(ml_df) < 6:
+                st.info("Model comparison needs at least six complete rows with finite numeric values.")
+                st.stop()
             X = ml_df[feature_cols].values
             y = ml_df[target_col].values
             
@@ -242,9 +257,13 @@ if uploaded_file is not None:
                         min_val = float(ml_df[feature].min())
                         max_val = float(ml_df[feature].max())
                         mean_val = float(ml_df[feature].mean())
-                        step_val = (max_val - min_val) / 100 if max_val > min_val else 1.0
-                        val = st.slider(feature, min_value=min_val, max_value=max_val, value=mean_val, step=step_val)
-                        input_data.append(val)
+                        if min_val == max_val:
+                            st.caption(f"{feature} is constant at {min_val:g}.")
+                            input_data.append(min_val)
+                        else:
+                            step_val = (max_val - min_val) / 100
+                            val = st.slider(feature, min_value=min_val, max_value=max_val, value=mean_val, step=step_val)
+                            input_data.append(val)
                         
                     prediction = best_model.predict([input_data])[0]
                     st.success(f"### 🎯 Predicted {target_col}:\n# **{prediction:,.2f}**")
